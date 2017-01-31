@@ -16,8 +16,13 @@
 
 import sys
 import os
+import subprocess
+import traceback
+from time import gmtime, strftime
 sys.path.append('hooks/')
 from charmhelpers.core.hookenv import action_fail
+from charmhelpers.core.hookenv import action_get
+from charmhelpers.core.hookenv import action_set
 from utils import (
     pause_unit,
     resume_unit,
@@ -37,7 +42,29 @@ def resume(args):
     resume_unit()
 
 
-ACTIONS = {"pause": pause, "resume": resume}
+def cleanup(args):
+    """Cleanup an hacluster resource."""
+    resource_name = (action_get("resource")).lower()
+
+    try:
+        subprocess.check_call(
+            ['crm', 'resource', 'cleanup', resource_name]
+        )
+        action_set({
+            'time-completed': (strftime("%Y-%m-%d %H:%M:%S", gmtime())),
+            'outcome': 'Success'}
+        )
+    except subprocess.CalledProcessError as e:
+        action_set({
+            'time-completed': (strftime("%Y-%m-%d %H:%M:%S", gmtime())),
+            'output': e.output,
+            'return-code': e.returncode,
+            'traceback': traceback.format_exc()})
+        action_fail("failed to restart crm resource", resource_name)
+
+
+
+ACTIONS = {"pause": pause, "resume": resume, "cleanup": cleanup}
 
 
 def main(args):
